@@ -33,17 +33,7 @@ class handler(BaseHTTPRequestHandler):
             if maybe_token:
                 token = maybe_token
 
-        if not token:
-            self.send_response(400)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({
-                "error": "missing_token",
-                "message": "Add ?token=<config-token> or use /manifest/<token>.json"
-            }).encode())
-            return
-
+        # When no token is provided (direct /manifest.json), fall back to default config.
         config = load_config(token)
         enabled_languages = config.get("enabled_languages", ["malayalam"])
 
@@ -56,8 +46,13 @@ class handler(BaseHTTPRequestHandler):
                     "name": LANGUAGE_NAMES[lang]
                 })
 
+        if token:
+            manifest_id = f"org.indian.catalog.{token[:8]}"
+        else:
+            manifest_id = "org.indian.catalog"
+
         manifest = {
-            "id": f"org.indian.catalog.{token[:8]}",
+            "id": manifest_id,
             "version": "2.0.0",
             "name": "Indian Movies OTT",
             "description": "Latest Indian Movies on OTT Platforms",
