@@ -35,10 +35,13 @@ except ImportError:
 
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        # Always log immediately - before any try block
+        print(f"[MANIFEST] ====== HANDLER CALLED ======")
+        print(f"[MANIFEST] Path: {self.path}")
+        print(f"[MANIFEST] Method: {self.command}")
+        print(f"[MANIFEST] Headers: {dict(self.headers)}")
+        
         try:
-            # Log the path for debugging
-            print(f"[MANIFEST] Received request: {self.path}")
-            print(f"[MANIFEST] Headers: {dict(self.headers)}")
             
             # Parse the path and query string
             # self.path includes query string in Vercel Python handlers

@@ -8,12 +8,16 @@
   ],
   "routes": [
     {
-      "src": "/manifest/(?<token>[^/]+)\\.json",
-      "dest": "/api/manifest.py?token=$token"
+      "src": "/manifest.json",
+      "dest": "/api/manifest.py"
     },
     {
-      "src": "/manifest.json(.*)",
-      "dest": "/api/manifest.py$1"
+      "src": "/manifest.json\\?(.*)",
+      "dest": "/api/manifest.py?$1"
+    },
+    {
+      "src": "/manifest/(?<token>[^/]+)\\.json",
+      "dest": "/api/manifest.py?token=$token"
     },
     {
       "src": "/catalog/movie/(?<catalog_id>[^/]+)\\.json",
