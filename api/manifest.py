@@ -25,17 +25,27 @@ except ImportError:
 class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
+            # Log the path for debugging
+            print(f"[MANIFEST] Received request: {self.path}")
+            print(f"[MANIFEST] Headers: {dict(self.headers)}")
+            
             # Parse the path and query string
             # self.path includes query string in Vercel Python handlers
             parsed_url = urlparse(self.path)
+            print(f"[MANIFEST] Parsed path: {parsed_url.path}, query: {parsed_url.query}")
+            
             query_params = parse_qs(parsed_url.query)
             token = query_params.get("token", [None])[0]
+            
+            if token:
+                print(f"[MANIFEST] Token found in query: {token[:20]}...")
 
             # Also check for token in path (for /manifest/<token>.json format)
             if not token and parsed_url.path.startswith("/manifest/"):
                 maybe_token = os.path.splitext(os.path.basename(parsed_url.path))[0]
                 if maybe_token and maybe_token != "manifest":
                     token = maybe_token
+                    print(f"[MANIFEST] Token found in path: {token[:20]}...")
 
             # When no token is provided (direct /manifest.json), fall back to default config.
             try:
@@ -82,14 +92,21 @@ class handler(BaseHTTPRequestHandler):
                 "idPrefixes": ["tt"]
             }
 
+            manifest_json = json.dumps(manifest, indent=None, separators=(',', ':'))
+            print(f"[MANIFEST] Sending manifest with {len(catalogs)} catalogs")
+            
             self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', '*')
             self.end_headers()
-            self.wfile.write(json.dumps(manifest, indent=None, separators=(',', ':')).encode())
+            self.wfile.write(manifest_json.encode('utf-8'))
+            self.wfile.flush()
         except Exception as e:
             import traceback
-            print(f"[ERROR] Manifest error: {traceback.format_exc()}")
+            error_trace = traceback.format_exc()
+            print(f"[ERROR] Manifest error: {error_trace}")
             # Return a minimal valid manifest even on error
             error_manifest = {
                 "id": "org.indian.catalog",
@@ -105,10 +122,26 @@ class handler(BaseHTTPRequestHandler):
                 }],
                 "idPrefixes": ["tt"]
             }
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(error_manifest, indent=None, separators=(',', ':')).encode())
+            try:
+                error_json = json.dumps(error_manifest, indent=None, separators=(',', ':'))
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json; charset=utf-8')
+                self.send_header('Access-Control-Allow-Origin', '*')
+                self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+                self.send_header('Access-Control-Allow-Headers', '*')
+                self.end_headers()
+                self.wfile.write(error_json.encode('utf-8'))
+                self.wfile.flush()
+            except Exception as send_error:
+                print(f"[ERROR] Failed to send error response: {send_error}")
+        return
+    
+    def do_OPTIONS(self):
+        """Handle CORS preflight requests"""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', '*')
+        self.end_headers()
         return
 
