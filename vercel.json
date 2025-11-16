@@ -6,15 +6,13 @@
       "use": "@vercel/python"
     }
   ],
+  "rewrites": [
+    {
+      "source": "/manifest.json",
+      "destination": "/api/manifest.py"
+    }
+  ],
   "routes": [
-    {
-      "src": "/manifest.json",
-      "dest": "/api/manifest.py"
-    },
-    {
-      "src": "/manifest.json\\?(.*)",
-      "dest": "/api/manifest.py?$1"
-    },
     {
       "src": "/manifest/(?<token>[^/]+)\\.json",
       "dest": "/api/manifest.py?token=$token"

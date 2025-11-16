@@ -39,15 +39,15 @@ class handler(BaseHTTPRequestHandler):
         print(f"[MANIFEST] ====== HANDLER CALLED ======")
         print(f"[MANIFEST] Path: {self.path}")
         print(f"[MANIFEST] Method: {self.command}")
-        print(f"[MANIFEST] Headers: {dict(self.headers)}")
         
         try:
-            
-            # Parse the path and query string
-            # self.path includes query string in Vercel Python handlers
+            # In Vercel, self.path includes the full path with query string
+            # It might be /api/manifest.py or /manifest.json depending on routing
+            # Query parameters are always preserved
             parsed_url = urlparse(self.path)
             print(f"[MANIFEST] Parsed path: {parsed_url.path}, query: {parsed_url.query}")
             
+            # Extract token from query parameters
             query_params = parse_qs(parsed_url.query)
             token = query_params.get("token", [None])[0]
             
@@ -55,11 +55,16 @@ class handler(BaseHTTPRequestHandler):
                 print(f"[MANIFEST] Token found in query: {token[:20]}...")
 
             # Also check for token in path (for /manifest/<token>.json format)
-            if not token and parsed_url.path.startswith("/manifest/"):
-                maybe_token = os.path.splitext(os.path.basename(parsed_url.path))[0]
-                if maybe_token and maybe_token != "manifest":
-                    token = maybe_token
-                    print(f"[MANIFEST] Token found in path: {token[:20]}...")
+            if not token:
+                # Check if path contains /manifest/ with a token
+                path_parts = parsed_url.path.split('/')
+                if 'manifest' in path_parts:
+                    idx = path_parts.index('manifest')
+                    if idx + 1 < len(path_parts):
+                        maybe_token = path_parts[idx + 1].replace('.json', '')
+                        if maybe_token and maybe_token != 'manifest':
+                            token = maybe_token
+                            print(f"[MANIFEST] Token found in path: {token[:20]}...")
 
             # When no token is provided (direct /manifest.json), fall back to default config.
             try:
