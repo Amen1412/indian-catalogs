@@ -553,6 +553,8 @@ class handler(BaseHTTPRequestHandler):
                 if decoded.get("tmdb_api_key") == tmdb_key and set(decoded.get("enabled_languages", [])) == set(enabled_languages):
                     token = existing_token
 
+            # Note: Cache will be populated when catalog is first accessed or when /refresh is called
+
             protocol = self.headers.get('x-forwarded-proto', 'https')
             host = self.headers.get('host', '')
             base_url = f"{protocol}://{host}" if host else ''
@@ -574,7 +576,7 @@ class handler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(json.dumps({
                 "status": "success",
-                "message": "Configuration saved successfully",
+                "message": "Configuration saved successfully. To populate the catalog, visit /refresh?token=YOUR_TOKEN or wait for the catalog to auto-populate on first access.",
                 "token": token,
                 "manifest_url": manifest_url,
                 "stremio_app_link": stremio_app_link,

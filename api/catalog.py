@@ -55,25 +55,50 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"metas": []}).encode())
             return
 
-        print(f"[INFO] Catalog requested for {lang}")
+        print(f"[INFO] Catalog requested for {lang} (token: {token[:20] if token else 'none'}...)")
 
         try:
             from api.utils import get_tmdb_key, fetch_movies_for_language, save_cache
             
+            # Try to load from cache
             cached_movies = load_cache(lang, token)
+            print(f"[INFO] Loaded {len(cached_movies)} movies from cache for {lang}")
             
-            # If cache is empty, try to fetch (this handles cold starts)
+            # If cache is empty, try to fetch (but limit pages to avoid timeout)
             if not cached_movies:
                 print(f"[INFO] Cache empty for {lang}, fetching movies...")
                 tmdb_key = get_tmdb_key(token)
-                if tmdb_key:
-                    try:
-                        cached_movies = fetch_movies_for_language(lang, tmdb_key)
+                if not tmdb_key:
+                    print(f"[ERROR] No TMDB API key found for {lang}")
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'application/json')
+                    self.send_header('Access-Control-Allow-Origin', '*')
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"metas": [], "error": "no_api_key"}).encode())
+                    return
+                
+                try:
+                    # Fetch movies (this might timeout on first request, that's ok)
+                    # User should trigger /refresh endpoint to populate cache
+                    print(f"[INFO] Starting fetch for {lang}...")
+                    cached_movies = fetch_movies_for_language(lang, tmdb_key)
+                    if cached_movies:
                         save_cache(lang, cached_movies, token)
-                    except Exception as e:
-                        print(f"[ERROR] Failed to fetch movies for {lang}: {e}")
+                        print(f"[INFO] Saved {len(cached_movies)} movies to cache for {lang}")
+                    else:
+                        print(f"[WARNING] Fetch returned no movies for {lang}")
+                except Exception as e:
+                    import traceback
+                    print(f"[ERROR] Failed to fetch movies for {lang}: {traceback.format_exc()}")
+                    # Return empty instead of failing - user can refresh manually
             
-            metas = [meta for meta in (to_stremio_meta(m) for m in cached_movies) if meta]
+            # Convert to Stremio format
+            metas = []
+            for movie in cached_movies:
+                meta = to_stremio_meta(movie)
+                if meta:
+                    metas.append(meta)
+            
             print(f"[INFO] Returning {len(metas)} total movies for {lang} ✅")
             
             self.send_response(200)
@@ -83,7 +108,9 @@ class handler(BaseHTTPRequestHandler):
             self.wfile.write(json.dumps({"metas": metas}).encode())
         except Exception as e:
             import traceback
-            print(f"[ERROR] Catalog error: {traceback.format_exc()}")
+            error_msg = traceback.format_exc()
+            print(f"[ERROR] Catalog error: {error_msg}")
+            # Always return valid JSON, even on error
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.send_header('Access-Control-Allow-Origin', '*')
